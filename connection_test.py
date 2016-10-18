@@ -6,6 +6,8 @@ import os
 
 HOST = "192.168.0.10" #define the IP address for the WiFi OBD dongle
 
+ENG_ON = 0 #engine on flag init to false (engine is off)
+
 print "Current working directory: " + os.getcwd() + "\n" #debug for dir
 
 filename = time.strftime("%Y-%m-%d-%H-%M-%S", time.gmtime()) + '.txt' #create .txt file with today's date and time of creation
@@ -51,11 +53,11 @@ try:
         f.write ("\n")
         time.sleep(1) #to prevent overflowing OBD buffer
 
-
+    ENG_ON = 1
     print "CAR IS ON!" 
     
     tn.close() #close telnet connection
-    f.close()
+    f.close() #close file
     print "Done"
 
 except KeyboardInterrupt: #catches CTRL-C and exits gracefully
