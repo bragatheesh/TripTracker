@@ -39,9 +39,10 @@ try:
     now = time.time() #stores current time into "now"
     done = now + 10 #stores 10 seconds from "now" into "done"
 
+    data = "00 00"
     
-    while time.time() < done #is true until current time is greater than 10 seconds from when loop was started
-    #need to change while condition to loop only when car is on, AKA RPM != 0
+    while data == "00 00"
+    #TODO: see what happens when RPM is polled with 1. Car OFF; 2. Key Pos 1; 3. Key Pos 2;
         tn.write("010C\r\n") #sends a request for RPM 
         data = tn.read_until("STOPPED", 2) #reads for up to 2 seconds or until the word "STOPPED" appears //need to find better way
         data = data.split("0C ", 1) #splits the resulting response by 0C, the string after 0C contains RPM data
@@ -50,6 +51,8 @@ try:
         f.write ("\n")
         time.sleep(1) #to prevent overflowing OBD buffer
 
+
+    print "CAR IS ON!" 
     
     tn.close() #close telnet connection
     f.close()
