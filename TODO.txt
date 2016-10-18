@@ -1,0 +1,14 @@
+TODO: 
+design a way to figure out if the car has been started
+	maybe poll rpm?
+	could be an ignition status we could read
+
+implement logic for polling vehicle speed for some resolution
+
+implement connection to a home server upon car shutting off, if no connection present, add current trip to queue and push when connected to home wifi
+
+implement the home server (huge task, will break down later)
+	recv data from pi and aggregate, run analytics, display graphically
+
+build connection infrastructure for bluetooh connectivity (will probably go down this route later on as wifi might prove to be unreliable)
+
