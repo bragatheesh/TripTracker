@@ -8,8 +8,8 @@ HOST = "192.168.0.10" #define the IP address for the WiFi OBD dongle
 
 print "Current working directory: " + os.getcwd() + "\n" #debug for dir
 
-#filename = time.strftime("%Y-%m-%d-%H-%M-%S", time.gmtime()) + '.txt' #create .txt file with today's date and time of creation
-#f = open(filename, 'w') #open file for writing
+filename = time.strftime("%Y-%m-%d-%H-%M-%S", time.gmtime()) + '.txt' #create .txt file with today's date and time of creation
+f = open(filename, 'w') #open file for writing
 
 try:
     print "Attempting to connect to obd" #debug
@@ -36,12 +36,26 @@ try:
     tn.write("atsp0\r\n") #enables automatic vehicle protocol detection
     time.sleep(1)
 
+    now = time.time() #stores current time into "now"
+    done = now + 10 #stores 10 seconds from "now" into "done"
+
+    
+    while time.time() < done #is true until current time is greater than 10 seconds from when loop was started
+    #need to change while condition to loop only when car is on, AKA RPM != 0
+        tn.write("010C\r\n") #sends a request for RPM 
+        data = tn.read_until("STOPPED", 2) #reads for up to 2 seconds or until the word "STOPPED" appears //need to find better way
+        data = data.split("0C ", 1) #splits the resulting response by 0C, the string after 0C contains RPM data
+        data = data[1] #sets data as the RPM data string
+        f.write(data) #writes RPM to file followed by a newline
+        f.write ("\n")
+        time.sleep(1) #to prevent overflowing OBD buffer
+
     
     tn.close() #close telnet connection
-    #f.close()
+    f.close()
     print "Done"
 
 except KeyboardInterrupt: #catches CTRL-C and exits gracefully
     print "Exiting"
     tn.close()
-    #f.close()
+    f.close()
