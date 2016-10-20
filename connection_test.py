@@ -6,10 +6,56 @@ import os
 
 HOST = "192.168.0.10" #define the IP address for the WiFi OBD dongle
 
+ENG_ON = 0 #engine on flag init to false (engine is off)
+INIT_FUEL_LEVEL = 0 #fuel level when car was turned on
+FIN_FUEL_LEVEL = 0 #fuel when car was turned off
+
 print "Current working directory: " + os.getcwd() + "\n" #debug for dir
 
 filename = time.strftime("%Y-%m-%d-%H-%M-%S", time.gmtime()) + '.txt' #create .txt file with today's date and time of creation
 f = open(filename, 'w') #open file for writing
+
+def wait_car_on(): #used to wait until car is on
+    rpm = "00 00" #init rpm to "00 00"
+    
+    while rpm == "00 00":
+
+        tn.write("010C\r\n") #sends a request for RPM 
+        rpm = tn.read_until("UNABLE TO CONNECT", 2) #reads for up to 2 seconds or until the word "UNABLE TO CONNECT" appears
+
+        rpm = rpm.split("0C ", 1) #splits the resulting response by 0C, the string after 0C contains RPM data
+
+        if len(rpm) == 2: 
+            #print "data size is 2"
+            rpm = rpm[1] #sets data as the RPM data string    
+
+        else:
+            rpm = "00 00" #added to cover case when ECU does not respond to RPM request and sends unexpected data 
+
+        time.sleep(1) #to prevent overflowing OBD buffer
+
+    f.write("Car turned on at" + time.strftime("%Y-%m-%d-%H-%M-%S", time.gmtime()) + "\n\n\n")
+    print "CAR IS ON!"
+    return 1
+
+def check_car_off(): #used to check if car is off
+
+    tn.write("010C\r\n") 
+    rpm = tn.read_until("UNABLE TO CONNECT", 2) 
+
+    rpm = rpm.split("0C ", 1)
+
+    if len(rpm) != 2: #covers the case when ECE does not return anything because car is off
+        print "CAR IS OFF"
+        return 0
+
+    rpm = rpm[1]
+
+    if rpm == "00 00":
+        print "CAR IS OFF"
+        return 0
+
+    return 1 #if none of the cases are true, we fall through and return that car is on
 
 try:
     print "Attempting to connect to obd" #debug
@@ -39,20 +85,63 @@ try:
     now = time.time() #stores current time into "now"
     done = now + 10 #stores 10 seconds from "now" into "done"
 
-    
-    while time.time() < done #is true until current time is greater than 10 seconds from when loop was started
-    #need to change while condition to loop only when car is on, AKA RPM != 0
-        tn.write("010C\r\n") #sends a request for RPM 
-        data = tn.read_until("STOPPED", 2) #reads for up to 2 seconds or until the word "STOPPED" appears //need to find better way
-        data = data.split("0C ", 1) #splits the resulting response by 0C, the string after 0C contains RPM data
-        data = data[1] #sets data as the RPM data string
-        f.write(data) #writes RPM to file followed by a newline
-        f.write ("\n")
-        time.sleep(1) #to prevent overflowing OBD buffer
+    ENG_ON = wait_car_on() #wait till car is on
 
+    if ENG_ON == 1: #grabbing initial fuel level
+        tn.write("012F\r\n") #sends a request for fuel level 
+        iFuel = tn.read_until("UNABLE TO CONNECT", 2)
+
+        iFuel = iFuel.split("2F ", 1) 
+        iFuel = iFuel[1]
+
+        if len(iFuel) == 2:
+            INIT_FUEL_LEVEL = int(iFuel, 0)
+            f.write("Initial Fuel Level: " + iFuel + "\n\n\n") #write initial fuel level as the first thing on the file
+
+        else:
+            f.write("Initial Fuel Level: N/A\n\n\n") #if ECU does not support fuel level input or unexpected output was returned
+            
+    while ENG_ON == 1: #this is where we spin gathering speed data and checking to see if the trip has ended
+
+        tn.write("010D\r\n") #sends a request for vehicle speed
+        speed = tn.read_until("UNABLE TO CONNECT", 2)
+
+        tn.write("0110\r\n") #requests Mass Air Flow rate which is used for calculating MPG
+        maf = tn.read_until("UNABLE TO CONNECT", 2)
+
+        speed = speed.split("0D ", 1)
+        speed = speed[1]
+
+        maf = maf.split("10 ", 1)
+        maf = maf[1]
+
+        f.write(time.strftime("%Y-%m-%d-%H-%M-%S", time.gmtime()) + " " + speed + " " + maf + "\n") #formula for calculating MPG is VSS * 7.718 / MAF
+
+        ENG_ON = check_car_off() #check to see if car has been turned off
+
+        time.sleep(5) #wait five seconds before polling speed and MAF again
+
+    #if we break out, it's because engine is off. Grab final fuel level and exit
+
+    tn.write("012F\r\n") #sends a request for fuel level 
+    fFuel = tn.read_until("UNABLE TO CONNECT", 2)
+
+    fFuel = fFuel.split("2F ", 1) 
+    fFuel = fFuel[1]
+
+    if len(fFuel) == 2:
+        FIN_FUEL_LEVEL = int(fFuel, 0)
+        f.write("Final Fuel Level: " + fFuel + "\n\n\n")
+
+    else:
+        f.write("Final Fuel Level: N/A\n\n\n")
+
+    if FIN_FUEL_LEVEL > INIT_FUEL_LEVEL: #we check here whether the car has been refilled with gas, this would trigger an entire tank fuel economy calculation
+        f.write("Car has been filled up with gas on this trip\n\n\n")
+        
     
     tn.close() #close telnet connection
-    f.close()
+    f.close() #close file
     print "Done"
 
 except KeyboardInterrupt: #catches CTRL-C and exits gracefully
