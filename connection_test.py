@@ -6,15 +6,19 @@ import os
 
 HOST = "192.168.0.10" #define the IP address for the WiFi OBD dongle
 
-ENG_ON = 0 #engine on flag init to false (engine is off)
-INIT_FUEL_LEVEL = 0 #fuel level when car was turned on
-FIN_FUEL_LEVEL = 0 #fuel when car was turned off
-FUEL_NA = 0 #flag to alert if ECU does not support fuel data
+global ENG_ON #engine on flag init to false (engine is off)
+global INIT_FUEL_LEVEL #fuel level when car was turned on
+global FIN_FUEL_LEVEL#fuel when car was turned off
+global FUEL_NA #flag to alert if ECU does not support fuel data
+global START_TIME
+global STOP_TIME
+global RUN_TIME
 
 print "Current working directory: " + os.getcwd() + "\n" #debug for dir
 
-filename = time.strftime("%Y-%m-%d-%H-%M-%S", time.gmtime()) + '.txt' #create .txt file with today's date and time of creation
+filename = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime()) + '.txt' #create .txt file with today's date and time of creation
 f = open(filename, 'w') #open file for writing
+
 
 def wait_car_on(): #used to wait until car is on
     rpm = "00 00" #init rpm to "00 00"
@@ -41,6 +45,7 @@ def wait_car_on(): #used to wait until car is on
         time.sleep(1) #to prevent overflowing OBD buffer
 
     f.write("Car turned on at " + time.strftime("%Y-%m-%d-%H-%M-%S", time.gmtime()) + "\n\n\n")
+    
     print "CAR IS ON!"
     return 1
 
@@ -70,6 +75,15 @@ def check_car_off(): #used to check if car is off
     return 1 #if none of the cases are true, we fall through and return that car is on
 
 try:
+
+    ENG_ON = 0 #engine on flag init to false (engine is off)
+    INIT_FUEL_LEVEL = 0 #fuel level when car was turned on
+    FIN_FUEL_LEVEL = 0 #fuel when car was turned off
+    FUEL_NA = 0 #flag to alert if ECU does not support fuel data
+    START_TIME = 0
+    STOP_TIME = 0
+    RUN_TIME = 0
+    
     print "Attempting to connect to obd" #debug
 
     tn = telnetlib.Telnet(HOST, 35000) #connect to obd dongle at port 35000 with IP defined above using telnet
@@ -96,8 +110,8 @@ try:
 
     
     print "Waiting for car to turn on"
-    #ENG_ON = wait_car_on() #wait till car is on
-    ENG_ON = 1
+    ENG_ON = wait_car_on() #wait till car is on
+    START_TIME = time.time()
     print "Getting initial fuel level"
     if ENG_ON == 1: #grabbing initial fuel level
         tn.write("012F\r\n") #sends a request for fuel level 
@@ -135,7 +149,7 @@ try:
         print "maf: " + maf
         
         speed = speed.split(" 41 0D ", 1)
-        print "speed after split: " + speed[1]
+        
         if len(speed) == 2:
             speed = speed[1]
             if len(speed) > 2: #this is to strip off all except for the first 2 characters
@@ -144,14 +158,14 @@ try:
                 length = -1 * length
                 speed = speed[:length]
 
-            else:
-                speed = "NA"
+        else:
+            speed = "NA"
             
 
         maf = maf.split(" 10 ", 1)
         if len(maf) == 2:
             maf = maf[1]
-            print "maf after split: " + maf
+            
 
         else:
             maf = "NA"
@@ -161,7 +175,8 @@ try:
         print time.strftime("%Y-%m-%d-%H-%M-%S", time.gmtime()) + " speed: " + speed + " maf: " + maf 
 
         ENG_ON = check_car_off() #check to see if car has been turned off
-
+        if ENG_ON == 0:
+            STOP_TIME = time.time()
         time.sleep(5) #wait five seconds before polling speed and MAF again
 
     #if we break out, it's because engine is off or something went wrong. Try to grab final fuel level and exit
@@ -180,9 +195,12 @@ try:
                 f.write("Car has been filled up with gas on this trip\n\n\n")
 
     else:
-        f.write("Final Fuel Level: N/A\n\n\n")
+        f.write("\n\n\nFinal Fuel Level: N/A\n\n\n")
 
-    
+    RUN_TIME = STOP_TIME - START_TIME
+    f.write("Car turned off at " + time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime()) + "\n\n\n")
+    f.write("Trip duration: " + str(RUN_TIME))
+    print "Trip duration: " + str(RUN_TIME)
         
     
     tn.close() #close telnet connection
