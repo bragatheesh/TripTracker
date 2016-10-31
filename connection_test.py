@@ -3,8 +3,13 @@ import telnetlib
 import time
 import datetime
 import os
+import socket
+
+SERVER = socket.gethostname() #this is the ip of the server, using gethostname right now for local testing
+SERVER_PORT = 6000 #port the server will be listening on
 
 HOST = "192.168.0.10" #define the IP address for the WiFi OBD dongle
+PORT = 35000 #port which the wifi obd dongle is listening for telnet connections
 
 global ENG_ON #engine on flag init to false (engine is off)
 global INIT_FUEL_LEVEL #fuel level when car was turned on
@@ -86,7 +91,7 @@ try:
     
     print "Attempting to connect to obd" #debug
 
-    tn = telnetlib.Telnet(HOST, 35000) #connect to obd dongle at port 35000 with IP defined above using telnet
+    tn = telnetlib.Telnet(HOST, PORT) #connect to obd dongle at port 35000 with IP defined above using telnet
 
     print "Connected!" #alert user that we have succesfully connected to obd dongle
 
@@ -205,6 +210,25 @@ try:
     
     tn.close() #close telnet connection
     f.close() #close file
+
+    #now we want to connect to the server to transfer our log file
+    #TODO: INSERT CODE TO SWITCH WIFI CONNECTION
+        #as a place holder, we will just wait for 10 seconds to have the user manually switch the wifi connection
+    time.sleep(10)
+`
+    #TODO: If wifi connection fails, we should store the names of the files to be transferred in a file called queue.txt
+    #which will be cleared after every successful transmit
+    
+    socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #creating a TCP socket
+    socket.connect((SERVER, SERVER_PORT)) #connecting to the server
+
+    with open(f, 'rb') as send_file: #open the log file for reading
+        for data in send_file:
+            socket.sendall(data) #send file over TCP to server
+
+    #TODO: we should wait for an ACK from the server containing the size of the file
+
+    socket.close() #close the socket 
     print "Done"
 
 except KeyboardInterrupt: #catches CTRL-C and exits gracefully
