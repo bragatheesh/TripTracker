@@ -215,7 +215,7 @@ try:
     #TODO: INSERT CODE TO SWITCH WIFI CONNECTION
         #as a place holder, we will just wait for 10 seconds to have the user manually switch the wifi connection
     time.sleep(10)
-`
+
     #TODO: If wifi connection fails, we should store the names of the files to be transferred in a file called queue.txt
     #which will be cleared after every successful transmit
     
